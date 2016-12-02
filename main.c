@@ -23,8 +23,8 @@ ADC input:
 2,244V...2,095V - 6V  operation  29° 2,244 ADC: 459
 2,095V or less - 12V operation   40° 2,095 ADC: 429
 
-Version 1.0c / 2016, Nov. 18th
-1.0c: change temperature range
+Version 1.0d / 2016, Nov. 23th
+1.0d: change temperature range
 Hardware setup:
 
 Attiny13 (DIP8 package, 8 pins)
