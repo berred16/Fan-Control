@@ -17,13 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Description:
 Measures the temperatur given by an LMT87 sensor.
 Controls 2 Outputs in order to switch the fan to 6V or 12V operation
+for a power supply.
 ADC input: 
-5...2,3V - off
-2,3V...1,6V - 6V  operation  
-1,6V or less - 12V operation 
+5...2,244V - off 
+2,244V...2,095V - 6V  operation  29° 2,244 ADC: 459
+2,095V or less - 12V operation   40° 2,095 ADC: 429
 
-Version 1.0a / 2016, Nov. 08th
-
+Version 1.0c / 2016, Nov. 18th
+1.0c: change temperature range
 Hardware setup:
 
 Attiny13 (DIP8 package, 8 pins)
@@ -33,80 +34,61 @@ Attiny13 (DIP8 package, 8 pins)
 				PB4 |3             6| PB1 6V oper. ->
 				GND |4-------------5| PB0 12V oper. ->
 
-Fuses: 
+Fuses:
+High Fuse: FF
+Low Fuse:  7A
 */
 
 #include <avr/io.h>
-#include <stdbool.h>
 #include <avr/interrupt.h>
 #define F_CPU 9600000UL
 
+define 6V_OP 459 // 2,244V, 29°
+define 12V_OP 429 // 2,095V, 40°
+
 void adc_init(void)
 	{
-		// ADC0 
-		ADMUX = (0<<REFS0)|(0<<MUX1)|(1<<MUX0); // ADC1, AREF=VCC (5V)
-		// single mode, adc clock = 1/128 of 8MHz = 62,5kHz, interrupt enabled 
-		ADCSRA = (1<<ADEN)|(1<<ADIE)|(1<<ADPS2)|(1<<ADPS1)|(0<<ADPS0); 
-		/* Datasheet
-		Bit 7: 1 ADEN Enable
-		Bit 6: 0 ADSC Start Conversation
-		Bit 5: 0 ADATE Trigger enable
-		Bit 4: 0 ADIF Interrupt flag
-		Bit 3: 1 ADIE Interrupt enable
-		Bit 2: 1 PS2 Prescalar
-		Bit 1: 1 PS1 Prescalar
-		Bit 0: 0 PS0 Prescalar
-		*/
+		// ADC1, AREF=VCC (5V)
+		ADMUX = (0<<REFS0)|(0<<MUX1)|(1<<MUX0); 
+		// ADC enable, interrupt enable, prescaler 1/128 
+		ADCSRA = (1<<ADEN)|(1<<ADIE)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0); 
+	}
+
+void timer_init(void)
+	{
+		TIMSK0 |= (1 << TOIE0); // Timer interrupts enable
+		TCCR0B = (1<<CS02)|(0<<CS01)|(1<<CS00);
 	}
 
 // variables for temperatur check
 char i;
-bool fan_6, fan_12;
 uint16_t temperature;
 
 void check_temperature(void)
 {
 
 
-if (temperature <= 460) // equals to 2,24V = 29°C
+if (temperature <= 6V_OP) // equals to 29°C
 	{
-		if (temperature >= 442) // equals to 1,90V = 35°C
+		if (temperature >= 12V_OP) // equals to 40°C
 			{
-				fan_12 = false;
-				fan_6 = true; // 6V operation between 29°C and 35°C
+				PORTB = 0x01; // 6V operation between 29°C and 40°C
 			}
 	}
 
-if (temperature > 460) // fans off when < 29°C
+if (temperature > 6V_OP) // fans off when < 29°C
 	{
-		fan_6 = false; 
-		fan_12 = false; 
+		PORTB = 0x00; // all fans off 
 	}
 
-if (temperature < 442) // fans on when > 35°C
+if (temperature < 12V_OP) // fans on when > 40°C
 	{
-		fan_6 = false; 
-		fan_12 = true;	
+		PORTB = 0x02; // 12V operation if more than 40°C	
 	}
 
-if (fan_6) // on port PB0
-	{
-		PORTB = 0x01;
-	}
-
-if (fan_12) // on port PB1
-	{
-		PORTB = 0x02;
-	}
-	
-if (!fan_6 && !fan_12)
-	{
-		PORTB = 0x00;
-	}
-				
-	// do not start ad converter every ISR
-	// not necessary
-	if (i > 250) // 250 just tested, is o.k.
+// do not start ad converter every ISR
+// not necessary
+if (i > 250) // 250 just tested, is o.k.
 	{
 		ADCSRA |= (1<<ADSC);
 		i = 0;
@@ -114,11 +96,6 @@ if (!fan_6 && !fan_12)
 	i++;
 }
 
-void timer_init(void)
-	{
-		TIMSK0 |= (1 << TOIE0); // Timer interrupts enable
-		TCCR0B = (1<<CS02)|(0<<CS01)|(1<<CS00);
-	}
 
 ISR (SIG_OVERFLOW0) // Timer overflow vector
 	{
@@ -141,6 +118,8 @@ adc_init();
 	
 timer_init();
 	
+temperature = 500; // to switch off the fans first
+
 sei();
 
 	while(1)
