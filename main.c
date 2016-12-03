@@ -43,8 +43,8 @@ Low Fuse:  7A
 #include <avr/interrupt.h>
 #define F_CPU 9600000UL
 
-define 6V_OP 459 // 2,244V, 29°
-define 12V_OP 429 // 2,095V, 40°
+#define SIX_V 459 // 2,244V, 29°
+#define TWELFE_V 429 // 2,095V, 40°
 
 void adc_init(void)
 	{
@@ -68,20 +68,20 @@ void check_temperature(void)
 {
 
 
-if (temperature <= 6V_OP) // equals to 29°C
+if (temperature <= SIX_V) // equals to 29°C
 	{
-		if (temperature >= 12V_OP) // equals to 40°C
+		if (temperature >= TWELFE_V) // equals to 40°C
 			{
 				PORTB = 0x01; // 6V operation between 29°C and 40°C
 			}
 	}
 
-if (temperature > 6V_OP) // fans off when < 29°C
+if (temperature > SIX_V) // fans off when < 29°C
 	{
 		PORTB = 0x00; // all fans off 
 	}
 
-if (temperature < 12V_OP) // fans on when > 40°C
+if (temperature < TWELFE_V) // fans on when > 40°C
 	{
 		PORTB = 0x02; // 12V operation if more than 40°C	
 	}
